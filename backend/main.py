@@ -4,7 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.models.schemas import (
@@ -156,8 +156,15 @@ async def update_settings(settings: Settings) -> Settings:
     return storage.settings
 
 
+@app.get("/pairs", response_model=List[str])
+async def list_pairs() -> List[str]:
+    return DEFAULT_PAIRS
+
+
 @app.post("/scan-market", response_model=List[MarketScanResult])
-async def scan_market(pairs: Optional[List[str]] = None, timeframe: str = "1h") -> List[MarketScanResult]:
+async def scan_market(
+    pairs: Optional[List[str]] = Body(None), timeframe: str = Body("1h")
+) -> List[MarketScanResult]:
     pair_list = pairs or DEFAULT_PAIRS
     return await market_scanner.scan(pair_list, timeframe=timeframe)
 
@@ -172,4 +179,3 @@ async def toggle_auto_trading(enabled: bool) -> Settings:
     new_settings = storage.settings.copy(deep=True, update={"auto_trading_enabled": enabled})
     await storage.update_settings(new_settings)
     return new_settings
-

@@ -5,6 +5,7 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (typeof window !== "undefined" ? `${window.location.origin}/api` : "/api");
 const REFRESH_MS = Number(import.meta.env.VITE_REFRESH_MS ?? 20000);
+const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
 
 const StatCard = ({ title, value, accent }) => (
   <div className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/30 backdrop-blur">
@@ -53,22 +54,45 @@ function App() {
   const [scanResults, setScanResults] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [priceInfo, setPriceInfo] = useState(null);
+  const [pairs, setPairs] = useState([]);
+  const [selectedPair, setSelectedPair] = useState("BTC/USDT");
+  const [selectedTimeframe, setSelectedTimeframe] = useState("1m");
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [settingsResp, signalsResp, tradesResp, portfolioResp, scanResp, suggestionsResp, priceResp] =
-        await Promise.all([
-          request("/settings"),
-          request("/signals"),
-          request("/trades"),
-          request("/portfolio"),
-          request("/scan-market", { method: "POST" }),
-          request("/manual-suggestions"),
-          request("/prices"),
-        ]);
+      const pairsResp = await request("/pairs");
+      const fetchedPairs = Array.isArray(pairsResp) ? pairsResp : [];
+      setPairs(fetchedPairs);
+      const activePair = fetchedPairs.includes(selectedPair) ? selectedPair : fetchedPairs[0] || selectedPair;
+      if (activePair !== selectedPair) {
+        setSelectedPair(activePair);
+      }
+
+      const [
+        settingsResp,
+        signalsResp,
+        tradesResp,
+        portfolioResp,
+        scanResp,
+        suggestionsResp,
+        priceResp,
+      ] = await Promise.all([
+        request("/settings"),
+        request("/signals"),
+        request("/trades"),
+        request("/portfolio"),
+        request("/scan-market", {
+          method: "POST",
+          body: JSON.stringify({ pairs: [activePair], timeframe: selectedTimeframe }),
+        }),
+        request("/manual-suggestions"),
+        request(
+          `/prices?pair=${encodeURIComponent(activePair)}&timeframe=${encodeURIComponent(selectedTimeframe)}`,
+        ),
+      ]);
       setSettings(settingsResp);
       setSettingsForm(settingsResp);
       setSignals(signalsResp);
@@ -84,7 +108,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, selectedPair, selectedTimeframe]);
 
   useEffect(() => {
     loadAll();
@@ -101,15 +125,29 @@ function App() {
     await loadAll();
   };
   const toggleAuto = async (enabled) => {
-    await request(`/auto-trade/${enabled}`, { method: "POST" });
-    await loadAll();
+    const previous = settingsForm ? { ...settingsForm } : null;
+    setSettingsForm((prev) => (prev ? { ...prev, auto_trading_enabled: enabled } : prev));
+    try {
+      await request(`/auto-trade/${enabled}`, { method: "POST" });
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      if (previous) setSettingsForm(previous);
+      setStatus("backend unavailable");
+    }
   };
   const generateSignal = async () => {
-    await request("/signals/generate", { method: "POST" });
+    await request(
+      `/signals/generate?pair=${encodeURIComponent(selectedPair)}&timeframe=${encodeURIComponent(selectedTimeframe)}`,
+      { method: "POST" },
+    );
     await loadAll();
   };
   const runScan = async () => {
-    await request("/scan-market", { method: "POST" });
+    await request("/scan-market", {
+      method: "POST",
+      body: JSON.stringify({ pairs: [selectedPair], timeframe: selectedTimeframe }),
+    });
     await loadAll();
   };
   const saveSettings = async () => {
@@ -287,21 +325,58 @@ function App() {
 
           <Section
             title="Live Signal & Price"
-            action={priceInfo && <Pill label={`${priceInfo.pair} • ${priceInfo.timeframe}`} />}
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={selectedPair}
+                  onChange={(e) => setSelectedPair(e.target.value)}
+                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                >
+                  {pairs.length === 0 && <option value={selectedPair}>{selectedPair}</option>}
+                  {pairs.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedTimeframe}
+                  onChange={(e) => setSelectedTimeframe(e.target.value)}
+                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                >
+                  {TIMEFRAMES.map((tf) => (
+                    <option key={tf} value={tf}>
+                      {tf}
+                    </option>
+                  ))}
+                </select>
+                <Pill label={`${priceInfo?.pair ?? selectedPair} • ${priceInfo?.timeframe ?? selectedTimeframe}`} />
+              </div>
+            }
           >
             {priceInfo ? (
-              <div className="space-y-2 text-sm text-slate-200">
-                <div className="flex flex-wrap gap-2">
-                  <Pill label={`RSI ${priceInfo.indicators.rsi?.toFixed(2) ?? "-"}`} />
-                  <Pill label={`EMA50 ${priceInfo.indicators.ema_50?.toFixed(2) ?? "-"}`} />
-                  <Pill label={`EMA200 ${priceInfo.indicators.ema_200?.toFixed(2) ?? "-"}`} />
-                  <Pill label={`MACD ${priceInfo.indicators.macd?.toFixed(2) ?? "-"}`} />
-                </div>
-                <p className="text-4xl font-semibold text-white">
-                  ${priceInfo.candles.at(-1)?.close?.toFixed(2) ?? "--"}
-                </p>
-                <p className="text-xs text-slate-400">Last candle {new Date(priceInfo.candles.at(-1)?.timestamp || 0).toLocaleTimeString()}</p>
-              </div>
+              (() => {
+                const lastCandle =
+                  priceInfo.candles && priceInfo.candles.length > 0
+                    ? priceInfo.candles[priceInfo.candles.length - 1]
+                    : null;
+                return (
+                  <div className="space-y-2 text-sm text-slate-200">
+                    <div className="flex flex-wrap gap-2">
+                      <Pill label={`RSI ${priceInfo.indicators.rsi?.toFixed(2) ?? "-"}`} />
+                      <Pill label={`EMA50 ${priceInfo.indicators.ema_50?.toFixed(2) ?? "-"}`} />
+                      <Pill label={`EMA200 ${priceInfo.indicators.ema_200?.toFixed(2) ?? "-"}`} />
+                      <Pill label={`MACD ${priceInfo.indicators.macd?.toFixed(2) ?? "-"}`} />
+                    </div>
+                    <p className="text-4xl font-semibold text-white">
+                      ${lastCandle?.close?.toFixed(2) ?? "--"}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Last candle {lastCandle ? new Date(lastCandle.timestamp).toLocaleTimeString() : "--"}
+                    </p>
+                  </div>
+                );
+              })()
             ) : (
               <p className="text-slate-400">Awaiting price data...</p>
             )}
