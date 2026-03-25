@@ -24,6 +24,9 @@ uvicorn backend.main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
+# Default dev proxy targets http://localhost:8000 via /api.
+# Or set a custom backend:
+# echo 'VITE_API_BASE=http://localhost:8000' > .env
 npm run dev   # or npm run build for production
 ```
 

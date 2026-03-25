@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./index.css";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (typeof window !== "undefined" ? `${window.location.origin}/api` : "/api");
 const REFRESH_MS = Number(import.meta.env.VITE_REFRESH_MS ?? 20000);
 
 const StatCard = ({ title, value, accent }) => (
