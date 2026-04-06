@@ -188,15 +188,28 @@ function App() {
         </header>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard title="Balance" value={`$${portfolio ? portfolio.balance.toFixed(2) : "0"}`} accent />
-          <StatCard title="Open Trades" value={portfolio ? portfolio.open_trades : totals.open} />
-          <StatCard title="Closed Trades" value={portfolio ? portfolio.closed_trades : trades.length - totals.open} />
           <StatCard
-            title="Total PnL"
+            title="Balance (USDT)"
+            value={`$${portfolio ? (portfolio.balance_usdt ?? portfolio.balance).toFixed(2) : "0"}`}
+            accent
+          />
+          <StatCard title="Open Trades" value={portfolio ? portfolio.open_trades : totals.open} />
+          <StatCard
+            title="Closed Trades"
+            value={portfolio ? portfolio.closed_trades : trades.length - totals.open}
+          />
+          <StatCard
+            title="PnL / ROI"
             value={`$${portfolio ? portfolio.total_pnl.toFixed(2) : totals.pnl.toFixed(2)}`}
             accent
           />
         </div>
+        {portfolio && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Pill label={`ROI ${portfolio.roi_pct?.toFixed(2) ?? "0.00"}%`} />
+            <Pill label={`Win Rate ${((portfolio.win_rate ?? 0) * 100).toFixed(1)}%`} />
+          </div>
+        )}
 
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Section
@@ -367,6 +380,13 @@ function App() {
                       <Pill label={`EMA50 ${priceInfo.indicators.ema_50?.toFixed(2) ?? "-"}`} />
                       <Pill label={`EMA200 ${priceInfo.indicators.ema_200?.toFixed(2) ?? "-"}`} />
                       <Pill label={`MACD ${priceInfo.indicators.macd?.toFixed(2) ?? "-"}`} />
+                      <Pill label={`WReg Mid ${priceInfo.indicators.regression_mid?.toFixed(2) ?? "-"}`} />
+                      <Pill
+                        label={`WReg Band ${priceInfo.indicators.regression_lower?.toFixed(2) ?? "-"} / ${priceInfo.indicators.regression_upper?.toFixed(2) ?? "-"}`}
+                      />
+                      <Pill
+                        label={`Fit ${priceInfo.indicators.regression_strength !== undefined && priceInfo.indicators.regression_strength !== null ? `${(priceInfo.indicators.regression_strength * 100).toFixed(1)}%` : "-"}`}
+                      />
                     </div>
                     <p className="text-4xl font-semibold text-white">
                       ${lastCandle?.close?.toFixed(2) ?? "--"}

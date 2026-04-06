@@ -27,6 +27,10 @@ class IndicatorSet(BaseModel):
     macd: Optional[float] = None
     macd_signal: Optional[float] = None
     macd_histogram: Optional[float] = None
+    regression_mid: Optional[float] = None
+    regression_upper: Optional[float] = None
+    regression_lower: Optional[float] = None
+    regression_strength: Optional[float] = None
 
 
 class SignalSide(str, Enum):
@@ -110,7 +114,11 @@ class PricesResponse(BaseModel):
 
 
 class Portfolio(BaseModel):
+    balance_usdt: float
     balance: float
+    initial_balance_usdt: float
     open_trades: int
     closed_trades: int
     total_pnl: float
+    roi_pct: float
+    win_rate: float

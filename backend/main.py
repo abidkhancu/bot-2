@@ -45,10 +45,31 @@ DEFAULT_PAIRS = [
     "LTC/USDT",
 ]
 
+
+AUTO_TRADE_TIMEFRAME = "1h"
+AUTO_TRADE_INTERVAL_SECONDS = 60
+
+
+async def _auto_trade_loop():
+    while True:
+        try:
+            settings = storage.settings
+            if settings.bot_running and settings.auto_trading_enabled:
+                for pair in DEFAULT_PAIRS:
+                    await _generate_signal_for_pair(pair, AUTO_TRADE_TIMEFRAME, settings)
+            await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
+        except Exception as exc:
+            print(f"auto-trade loop error: {exc}")
+            await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(market_scanner.scan(DEFAULT_PAIRS))
+    market_scan_task = asyncio.create_task(market_scanner.scan(DEFAULT_PAIRS))
+    auto_trade_task = asyncio.create_task(_auto_trade_loop())
     yield
+    market_scan_task.cancel()
+    auto_trade_task.cancel()
 
 
 app = FastAPI(title="Crypto Trading Bot (Paper Trading)", lifespan=lifespan)
@@ -120,14 +141,24 @@ async def list_trades() -> List[Trade]:
 @app.get("/portfolio", response_model=Portfolio)
 async def portfolio() -> Portfolio:
     trades = await storage.list_trades()
+    balance = storage.get_balance()
+    initial_balance = storage.get_initial_balance()
     total_pnl = sum(t.pnl for t in trades)
     open_trades = len([t for t in trades if t.status == TradeStatus.open])
     closed_trades = len(trades) - open_trades
+    closed = [t for t in trades if t.status == TradeStatus.closed]
+    wins = [t for t in closed if t.pnl > 0]
+    win_rate = (len(wins) / len(closed)) if closed else 0.0
+    roi_pct = ((balance - initial_balance) / initial_balance * 100) if initial_balance else 0.0
     return Portfolio(
-        balance=storage.get_balance(),
+        balance_usdt=balance,
+        balance=balance,
+        initial_balance_usdt=initial_balance,
         open_trades=open_trades,
         closed_trades=closed_trades,
         total_pnl=total_pnl,
+        roi_pct=roi_pct,
+        win_rate=win_rate,
     )
 
 

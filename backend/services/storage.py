@@ -30,6 +30,9 @@ class StorageService:
     def get_balance(self) -> float:
         return self._balances["USD"]
 
+    def get_initial_balance(self) -> float:
+        return 1000.0
+
     async def update_settings(self, new_settings: Settings) -> Settings:
         async with self._lock:
             # Preserve start balance when toggling
