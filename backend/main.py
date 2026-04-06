@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -32,6 +33,7 @@ indicator_engine = IndicatorEngine()
 strategy_engine = StrategyEngine()
 paper_trading_engine = PaperTradingEngine(storage)
 market_scanner = MarketScanner(market_data_service, indicator_engine, storage)
+logger = logging.getLogger(__name__)
 
 DEFAULT_PAIRS = [
     "BTC/USDT",
@@ -47,7 +49,7 @@ DEFAULT_PAIRS = [
 
 
 AUTO_TRADE_TIMEFRAME = "1h"
-AUTO_TRADE_INTERVAL_SECONDS = 60
+AUTO_TRADE_INTERVAL_SECONDS = 300
 
 
 async def _auto_trade_loop():
@@ -59,7 +61,7 @@ async def _auto_trade_loop():
                     await _generate_signal_for_pair(pair, AUTO_TRADE_TIMEFRAME, settings)
             await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
         except Exception as exc:
-            print(f"auto-trade loop error: {exc}")
+            logger.exception("auto-trade loop error: %s", exc)
             await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
 
 

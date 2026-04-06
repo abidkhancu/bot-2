@@ -44,7 +44,7 @@ class IndicatorEngine:
 
         recent = series.tail(period).astype(float).values
         x = np.arange(period, dtype=float)
-        # Weighted regression: give more influence to newer candles
+        # 1.0 -> 2.0 gives a conservative recency bias (~2x weight to newest candles) for responsiveness without overfitting noise.
         weights = np.linspace(1.0, 2.0, period)
         slope, intercept = np.polyfit(x, recent, 1, w=weights)
         fit_line = slope * x + intercept

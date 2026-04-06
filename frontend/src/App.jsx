@@ -6,6 +6,10 @@ const API_BASE =
   (typeof window !== "undefined" ? `${window.location.origin}/api` : "/api");
 const REFRESH_MS = Number(import.meta.env.VITE_REFRESH_MS ?? 20000);
 const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
+const formatRegressionFit = (value) => {
+  if (value === undefined || value === null) return "-";
+  return `${(value * 100).toFixed(1)}%`;
+};
 
 const StatCard = ({ title, value, accent }) => (
   <div className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/30 backdrop-blur">
@@ -190,7 +194,7 @@ function App() {
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard
             title="Balance (USDT)"
-            value={`$${portfolio ? (portfolio.balance_usdt ?? portfolio.balance).toFixed(2) : "0"}`}
+            value={`$${portfolio ? portfolio.balance_usdt.toFixed(2) : "0"}`}
             accent
           />
           <StatCard title="Open Trades" value={portfolio ? portfolio.open_trades : totals.open} />
@@ -385,7 +389,7 @@ function App() {
                         label={`WReg Band ${priceInfo.indicators.regression_lower?.toFixed(2) ?? "-"} / ${priceInfo.indicators.regression_upper?.toFixed(2) ?? "-"}`}
                       />
                       <Pill
-                        label={`Fit ${priceInfo.indicators.regression_strength !== undefined && priceInfo.indicators.regression_strength !== null ? `${(priceInfo.indicators.regression_strength * 100).toFixed(1)}%` : "-"}`}
+                        label={`Fit ${formatRegressionFit(priceInfo.indicators.regression_strength)}`}
                       />
                     </div>
                     <p className="text-4xl font-semibold text-white">

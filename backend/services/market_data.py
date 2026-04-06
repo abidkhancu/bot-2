@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Dict, Tuple
 
@@ -10,6 +11,7 @@ import pandas as pd
 import ccxt.async_support as ccxt_async
 
 CACHE_TTL_SECONDS = 15
+logger = logging.getLogger(__name__)
 
 
 class MarketDataService:
@@ -36,6 +38,7 @@ class MarketDataService:
             await exchange.close()
             df = pd.DataFrame(raw, columns=["timestamp", "open", "high", "low", "close", "volume"])
         except Exception:
+            logger.exception("fetch_ohlcv failed for %s %s, using synthetic data fallback", pair, timeframe)
             df = self._generate_synthetic(limit)
 
         async with self._lock:
