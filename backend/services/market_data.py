@@ -67,7 +67,7 @@ class MarketDataService:
                 and "/" in symbol
             ]
             pairs = sorted(set(pairs))
-        except Exception:
+        except (ccxt_async.NetworkError, ccxt_async.ExchangeError, asyncio.TimeoutError):
             logger.exception("fetch_usdt_pairs failed, returning empty list for caller fallback handling")
             pairs = []
 

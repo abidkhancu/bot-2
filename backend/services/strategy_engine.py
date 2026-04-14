@@ -16,6 +16,8 @@ class StrategyEngine:
 
         if indicators.ema_50 is not None and indicators.ema_200 is not None and indicators.ema_200 != 0:
             trend_strength = abs(indicators.ema_50 - indicators.ema_200) / indicators.ema_200
+            # 2.0 scale with 0.2 cap gives trend a bounded lift so it improves signal quality
+            # without dominating RSI, MACD, and regression contributions.
             confidence += min(trend_strength * 2.0, 0.2)
 
         if indicators.macd_histogram is not None:
