@@ -8,6 +8,10 @@ from backend.models.schemas import IndicatorSet, Settings, Signal, SignalSide
 
 
 class StrategyEngine:
+    # Tuned to reward clearer EMA separation while capping trend impact on confidence.
+    TREND_STRENGTH_MULTIPLIER = 2.0
+    TREND_CONFIDENCE_CAP = 0.2
+
     def __init__(self) -> None:
         self._confidence_floor = 0.3
 
@@ -16,10 +20,13 @@ class StrategyEngine:
 
         trend_strength = self._trend_strength_ratio(indicators)
         if trend_strength is not None:
-            # The 2.0 scaling with 0.2 cap keeps trend impact meaningful but bounded:
+            # The scaling with cap keeps trend impact meaningful but bounded:
             # it rewards clear trend separation while preventing trend from overpowering
             # RSI, MACD, and regression components in overall confidence.
-            confidence += min(trend_strength * 2.0, 0.2)
+            confidence += min(
+                trend_strength * self.TREND_STRENGTH_MULTIPLIER,
+                self.TREND_CONFIDENCE_CAP,
+            )
 
         if indicators.macd_histogram is not None:
             if (is_buy and indicators.macd_histogram > 0) or (not is_buy and indicators.macd_histogram < 0):

@@ -50,9 +50,9 @@ FALLBACK_PAIRS = [
 
 
 MAX_RUNTIME_PAIRS = 200
-# Optional priority pair (BASE/QUOTE) force-added when discovery omits it.
-# Default keeps prior behavior from earlier user-requested RAVE/USDT emphasis.
-PRIORITY_PAIR = os.getenv("BOT_PRIORITY_PAIR", "RAVE/USDT")
+# Optional priority pair in BASE/QUOTE format (example: BTC/USDT), force-added when discovery omits it.
+PRIORITY_PAIR = os.getenv("BOT_PRIORITY_PAIR", "BTC/USDT")
+_last_filter_empty_state = False
 
 
 async def _runtime_pairs(max_pairs: int = MAX_RUNTIME_PAIRS) -> List[str]:
@@ -68,6 +68,7 @@ async def _runtime_pairs(max_pairs: int = MAX_RUNTIME_PAIRS) -> List[str]:
 
 
 async def _auto_trade_loop():
+    global _last_filter_empty_state
     while True:
         try:
             settings = storage.settings
@@ -83,12 +84,16 @@ async def _auto_trade_loop():
                 # If score filter removes everything, fall back to candidates so automation continues running.
                 target_pairs = ranked_pairs or candidate_pairs
                 if not ranked_pairs:
-                    logger.warning(
-                        "Auto-trade: no pairs met minimum market score threshold (%.4f), "
-                        "falling back to %d unfiltered candidate pairs",
-                        settings.min_market_score,
-                        len(candidate_pairs),
-                    )
+                    if not _last_filter_empty_state:
+                        logger.warning(
+                            "Auto-trade: no pairs met minimum market score threshold (%.4f), "
+                            "falling back to %d unfiltered candidate pairs",
+                            settings.min_market_score,
+                            len(candidate_pairs),
+                        )
+                    _last_filter_empty_state = True
+                else:
+                    _last_filter_empty_state = False
                 for pair in target_pairs:
                     await _generate_signal_for_pair(
                         pair,

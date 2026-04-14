@@ -19,6 +19,15 @@ class PaperTradingEngine:
         open_trades = await self._open_trades()
         return any(t.pair == pair and t.side == side for t in open_trades)
 
+    def _position_quantity(self, balance: float, risk_per_trade: float, entry: float, stop_loss: float) -> float:
+        if entry <= 0 or balance <= 0:
+            return 0.0
+        risk_amount = balance * risk_per_trade
+        risk_per_unit = max(abs(entry - stop_loss), 1e-6)
+        risk_based_quantity = max(risk_amount / risk_per_unit, 0.0)
+        balance_limited_quantity = balance / entry
+        return min(risk_based_quantity, balance_limited_quantity)
+
     async def apply_signal(self, signal: Signal, settings: Settings) -> None:
         if not settings.auto_trading_enabled or not settings.bot_running:
             return
@@ -43,14 +52,7 @@ class PaperTradingEngine:
 
     async def _open_long(self, signal: Signal, settings: Settings) -> None:
         balance = self.storage.get_balance()
-        if signal.entry <= 0 or balance <= 0:
-            return
-        risk_amount = balance * settings.risk_per_trade
-        risk_per_unit = max(signal.entry - signal.stop_loss, 1e-6)
-        risk_based_quantity = max(risk_amount / risk_per_unit, 0.0)
-        # Cap size by available-balance affordability after the positive-entry guard above.
-        balance_limited_quantity = balance / signal.entry
-        quantity = min(risk_based_quantity, balance_limited_quantity)
+        quantity = self._position_quantity(balance, settings.risk_per_trade, signal.entry, signal.stop_loss)
         if quantity <= 0:
             return
         trade = Trade(
@@ -69,13 +71,7 @@ class PaperTradingEngine:
 
     async def _open_short(self, signal: Signal, settings: Settings) -> None:
         balance = self.storage.get_balance()
-        if signal.entry <= 0 or balance <= 0:
-            return
-        risk_amount = balance * settings.risk_per_trade
-        risk_per_unit = max(signal.stop_loss - signal.entry, 1e-6)
-        risk_based_quantity = max(risk_amount / risk_per_unit, 0.0)
-        margin_limited_quantity = balance / signal.entry
-        quantity = min(risk_based_quantity, margin_limited_quantity)
+        quantity = self._position_quantity(balance, settings.risk_per_trade, signal.entry, signal.stop_loss)
         if quantity <= 0:
             return
         trade = Trade(
