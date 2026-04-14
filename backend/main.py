@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -45,21 +46,21 @@ FALLBACK_PAIRS = [
     "DOGE/USDT",
     "DOT/USDT",
     "LTC/USDT",
-    "RAVE/USDT",
+    "RAVE/USDT",  # User-requested pair fallback when market discovery is unavailable.
 ]
 
 
 MAX_RUNTIME_PAIRS = 120
-PRIORITY_PAIR = "RAVE/USDT"
+PRIORITY_PAIR = os.getenv("BOT_PRIORITY_PAIR", "RAVE/USDT")
 
 
 async def _runtime_pairs(max_pairs: int = MAX_RUNTIME_PAIRS) -> List[str]:
     discovered_pairs = await market_data_service.fetch_usdt_pairs(max_pairs=max_pairs)
     if discovered_pairs:
         if PRIORITY_PAIR not in discovered_pairs:
-            # Keep requested pair visible even if the exchange temporarily omits it from discovered markets.
-            discovered_pairs = [PRIORITY_PAIR, *discovered_pairs]
-        return discovered_pairs[:max_pairs]
+            # Keep the configured priority pair visible if exchange discovery temporarily omits it.
+            return [PRIORITY_PAIR, *discovered_pairs][:max_pairs]
+        return discovered_pairs
     return FALLBACK_PAIRS[:max_pairs]
 
 
@@ -71,7 +72,7 @@ async def _auto_trade_loop():
                 max_pairs = min(settings.auto_trade_max_pairs, MAX_RUNTIME_PAIRS)
                 candidate_pairs = await _runtime_pairs(max_pairs=max_pairs)
                 scan_results = await market_scanner.scan(candidate_pairs, timeframe=settings.auto_trade_timeframe)
-                ranked_pairs = [r.pair for r in scan_results if r.score >= settings.min_market_score][:max_pairs]
+                ranked_pairs = [r.pair for r in scan_results if r.score >= settings.min_market_score]
                 target_pairs = ranked_pairs or candidate_pairs
                 for pair in target_pairs:
                     await _generate_signal_for_pair(

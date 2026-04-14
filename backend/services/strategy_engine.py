@@ -14,7 +14,7 @@ class StrategyEngine:
     def _signal_confidence(self, base: float, indicators: IndicatorSet, is_buy: bool) -> float:
         confidence = base
 
-        if indicators.ema_50 is not None and indicators.ema_200 is not None and indicators.ema_200 != 0:
+        if indicators.ema_50 is not None and indicators.ema_200 is not None and abs(indicators.ema_200) > 1e-6:
             trend_strength = abs(indicators.ema_50 - indicators.ema_200) / indicators.ema_200
             # 2.0 scale with 0.2 cap gives trend a bounded lift so it improves signal quality
             # without dominating RSI, MACD, and regression contributions.
