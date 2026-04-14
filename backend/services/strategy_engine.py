@@ -14,8 +14,8 @@ class StrategyEngine:
     def _signal_confidence(self, base: float, indicators: IndicatorSet, is_buy: bool) -> float:
         confidence = base
 
-        if indicators.ema_50 is not None and indicators.ema_200 is not None and indicators.ema_200 > 1e-6:
-            trend_strength = abs(indicators.ema_50 - indicators.ema_200) / indicators.ema_200
+        trend_strength = self._trend_strength_ratio(indicators)
+        if trend_strength is not None:
             # The 2.0 scaling with 0.2 cap keeps trend impact meaningful but bounded:
             # it rewards clear trend separation while preventing trend from overpowering
             # RSI, MACD, and regression components in overall confidence.
@@ -29,6 +29,51 @@ class StrategyEngine:
             confidence += min(indicators.regression_strength * 0.2, 0.2)
 
         return min(max(confidence, self._confidence_floor), 1.0)
+
+    def _trend_strength_ratio(self, indicators: IndicatorSet) -> Optional[float]:
+        if (
+            indicators.ema_50 is None
+            or indicators.ema_200 is None
+            or indicators.ema_200 <= 1e-6
+        ):
+            return None
+        return abs(indicators.ema_50 - indicators.ema_200) / indicators.ema_200
+
+    def _passes_smart_filters(
+        self,
+        *,
+        is_buy: bool,
+        price: float,
+        indicators: IndicatorSet,
+        settings: Settings,
+    ) -> bool:
+        if not settings.use_smart_strategy:
+            return True
+
+        trend_strength = self._trend_strength_ratio(indicators)
+        if trend_strength is None:
+            return False
+        if trend_strength < settings.min_trend_strength:
+            return False
+
+        if (indicators.regression_strength or 0.0) < settings.min_regression_strength:
+            return False
+
+        if indicators.macd_histogram is None:
+            return False
+
+        if is_buy:
+            return (
+                price > indicators.ema_50
+                and indicators.ema_50 > indicators.ema_200
+                and indicators.macd_histogram > 0
+            )
+
+        return (
+            price < indicators.ema_50
+            and indicators.ema_50 < indicators.ema_200
+            and indicators.macd_histogram < 0
+        )
 
     def generate_signal(
         self,
@@ -46,7 +91,16 @@ class StrategyEngine:
         sl_pct = settings.stop_loss_pct
 
         # BUY condition
-        if price > indicators.ema_200 and indicators.rsi < settings.buy_rsi_threshold:
+        if (
+            price > indicators.ema_200
+            and indicators.rsi < settings.buy_rsi_threshold
+            and self._passes_smart_filters(
+                is_buy=True,
+                price=price,
+                indicators=indicators,
+                settings=settings,
+            )
+        ):
             confidence = self._signal_confidence(
                 self._confidence_floor + (settings.buy_rsi_threshold - indicators.rsi) / 100,
                 indicators,
@@ -64,7 +118,15 @@ class StrategyEngine:
             )
 
         # SELL condition
-        if indicators.rsi > settings.sell_rsi_threshold:
+        if (
+            indicators.rsi > settings.sell_rsi_threshold
+            and self._passes_smart_filters(
+                is_buy=False,
+                price=price,
+                indicators=indicators,
+                settings=settings,
+            )
+        ):
             confidence = self._signal_confidence(
                 self._confidence_floor + (indicators.rsi - settings.sell_rsi_threshold) / 100,
                 indicators,

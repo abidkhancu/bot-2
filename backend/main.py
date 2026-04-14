@@ -50,7 +50,8 @@ FALLBACK_PAIRS = [
 
 
 MAX_RUNTIME_PAIRS = 200
-# Optional priority pair (BASE/QUOTE, e.g. RAVE/USDT) force-added when discovery omits it.
+# Optional priority pair (BASE/QUOTE) force-added when discovery omits it.
+# Default keeps prior behavior from earlier user-requested RAVE/USDT emphasis.
 PRIORITY_PAIR = os.getenv("BOT_PRIORITY_PAIR", "RAVE/USDT")
 
 
@@ -72,11 +73,22 @@ async def _auto_trade_loop():
             settings = storage.settings
             if settings.bot_running and settings.auto_trading_enabled:
                 max_pairs = min(settings.auto_trade_max_pairs, MAX_RUNTIME_PAIRS)
-                candidate_pairs = await _runtime_pairs(max_pairs=max_pairs)
+                selected_pair = (settings.auto_trade_pair or "ALL").strip().upper()
+                if selected_pair != "ALL":
+                    candidate_pairs = [selected_pair]
+                else:
+                    candidate_pairs = await _runtime_pairs(max_pairs=max_pairs)
                 scan_results = await market_scanner.scan(candidate_pairs, timeframe=settings.auto_trade_timeframe)
                 ranked_pairs = [r.pair for r in scan_results if r.score >= settings.min_market_score]
                 # If score filter removes everything, fall back to candidates so automation continues running.
                 target_pairs = ranked_pairs or candidate_pairs
+                if not ranked_pairs:
+                    logger.warning(
+                        "Auto-trade: no pairs met minimum market score threshold (%.4f), "
+                        "falling back to %d unfiltered candidate pairs",
+                        settings.min_market_score,
+                        len(candidate_pairs),
+                    )
                 for pair in target_pairs:
                     await _generate_signal_for_pair(
                         pair,

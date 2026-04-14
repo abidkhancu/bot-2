@@ -333,6 +333,23 @@ function App() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-slate-200">
+                    Auto trade pair
+                    <select
+                      value={settingsForm.auto_trade_pair ?? "ALL"}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, auto_trade_pair: e.target.value })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    >
+                      <option value="ALL">ALL</option>
+                      {[...new Set([selectedPair, ...(pairs || [])].filter(Boolean))].map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
                     Auto interval (seconds)
                     <input
                       type="number"
@@ -395,6 +412,40 @@ function App() {
                       className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
                     />
                   </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min trend strength
+                    <input
+                      type="number"
+                      min="0"
+                      max="0.5"
+                      step="0.0001"
+                      value={settingsForm.min_trend_strength ?? 0.0015}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_trend_strength: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min regression strength
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settingsForm.min_regression_strength ?? 0.15}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_regression_strength: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -415,6 +466,17 @@ function App() {
                       className="h-4 w-4 accent-emerald-400"
                     />
                     Enable Database (prep)
+                  </label>
+                  <label className="flex items-center gap-2 text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.use_smart_strategy ?? true}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, use_smart_strategy: e.target.checked })
+                      }
+                      className="h-4 w-4 accent-emerald-400"
+                    />
+                    Smart strategy filter
                   </label>
                   <Pill label={`Mode: ${settingsForm.mode}`} />
                   <Pill label={settings?.bot_running ? "Running" : "Stopped"} />
