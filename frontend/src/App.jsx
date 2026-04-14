@@ -5,10 +5,18 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (typeof window !== "undefined" ? `${window.location.origin}/api` : "/api");
 const REFRESH_MS = Number(import.meta.env.VITE_REFRESH_MS ?? 20000);
-const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
+const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"];
 const formatRegressionFit = (value) => {
   if (value === undefined || value === null) return "-";
   return `${(value * 100).toFixed(1)}%`;
+};
+const formatConfidence = (value) => {
+  if (value === undefined || value === null) return "-";
+  return `${(value * 100).toFixed(2)}%`;
+};
+const formatScore = (value) => {
+  if (value === undefined || value === null) return "-";
+  return value.toFixed(4);
 };
 
 const StatCard = ({ title, value, accent }) => (
@@ -130,9 +138,14 @@ function App() {
   };
   const toggleAuto = async (enabled) => {
     const previous = settingsForm ? { ...settingsForm } : null;
-    setSettingsForm((prev) => (prev ? { ...prev, auto_trading_enabled: enabled } : prev));
+    const nextSettings = settingsForm ? { ...settingsForm, auto_trading_enabled: enabled } : null;
+    setSettingsForm(nextSettings);
     try {
-      await request(`/auto-trade/${enabled}`, { method: "POST" });
+      if (nextSettings) {
+        await request("/settings", { method: "POST", body: JSON.stringify(nextSettings) });
+      } else {
+        await request(`/auto-trade/${enabled}`, { method: "POST" });
+      }
       await loadAll();
     } catch (err) {
       console.error(err);
@@ -173,6 +186,9 @@ function App() {
             <p className="text-sm uppercase tracking-wide text-emerald-300">Paper Trading MVP</p>
             <h1 className="text-3xl font-bold text-white">Crypto Trading Bot</h1>
             <p className="text-sm text-slate-300">Async FastAPI backend • React + Tailwind UI</p>
+            <p className="text-xs text-emerald-200">
+              AI-assisted market analysis uses RSI, EMA, MACD, and regression scoring to guide entries/exits.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -190,6 +206,11 @@ function App() {
             <Pill label={status || "loading..."} />
           </div>
         </header>
+        {status === "backend unavailable" && (
+          <div className="mb-4 rounded-xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            Backend is not reachable. Start FastAPI on port 8000 or set VITE_API_BASE correctly to make live data visible.
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard
@@ -303,6 +324,136 @@ function App() {
                       className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
                     />
                   </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Auto trade timeframe
+                    <select
+                      value={settingsForm.auto_trade_timeframe}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, auto_trade_timeframe: e.target.value })
+                      }
+                      className="rounded border border-white/10 bg-slate-100 px-3 py-2 text-slate-900"
+                    >
+                      {TIMEFRAMES.map((tf) => (
+                        <option key={tf} value={tf}>
+                          {tf}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Auto trade pair
+                    <select
+                      value={settingsForm.auto_trade_pair ?? "ALL"}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, auto_trade_pair: e.target.value })
+                      }
+                      className="rounded border border-white/10 bg-slate-100 px-3 py-2 text-slate-900"
+                    >
+                      <option value="ALL">ALL</option>
+                      {[...new Set([selectedPair, ...(pairs || [])].filter(Boolean))].map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Auto interval (seconds)
+                    <input
+                      type="number"
+                      min="15"
+                      max="3600"
+                      value={settingsForm.auto_trade_interval_seconds}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          auto_trade_interval_seconds: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Auto max pairs
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={settingsForm.auto_trade_max_pairs}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, auto_trade_max_pairs: Number(e.target.value) })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min signal confidence (0-1)
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settingsForm.min_signal_confidence}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_signal_confidence: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min market score (0-1)
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settingsForm.min_market_score}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_market_score: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min trend strength
+                    <input
+                      type="number"
+                      min="0"
+                      max="0.5"
+                      step="0.0001"
+                      value={settingsForm.min_trend_strength ?? 0.0015}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_trend_strength: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min regression strength
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settingsForm.min_regression_strength ?? 0.15}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_regression_strength: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -323,6 +474,17 @@ function App() {
                       className="h-4 w-4 accent-emerald-400"
                     />
                     Enable Database (prep)
+                  </label>
+                  <label className="flex items-center gap-2 text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settingsForm.use_smart_strategy ?? true}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, use_smart_strategy: e.target.checked })
+                      }
+                      className="h-4 w-4 accent-emerald-400"
+                    />
+                    Smart strategy filter
                   </label>
                   <Pill label={`Mode: ${settingsForm.mode}`} />
                   <Pill label={settings?.bot_running ? "Running" : "Stopped"} />
@@ -347,7 +509,7 @@ function App() {
                 <select
                   value={selectedPair}
                   onChange={(e) => setSelectedPair(e.target.value)}
-                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                      className="rounded border border-white/10 bg-slate-100 px-2 py-1 text-xs text-slate-900"
                 >
                   {pairs.length === 0 && <option value={selectedPair}>{selectedPair}</option>}
                   {pairs.map((p) => (
@@ -359,7 +521,7 @@ function App() {
                 <select
                   value={selectedTimeframe}
                   onChange={(e) => setSelectedTimeframe(e.target.value)}
-                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                  className="rounded border border-white/10 bg-slate-100 px-2 py-1 text-xs text-slate-900"
                 >
                   {TIMEFRAMES.map((tf) => (
                     <option key={tf} value={tf}>
@@ -415,7 +577,7 @@ function App() {
                   <div key={s.pair} className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{s.pair}</p>
-                      <Pill label={`${Math.round(s.confidence * 100)}%`} />
+                      <Pill label={formatConfidence(s.confidence)} />
                     </div>
                     <p className="text-slate-300">{s.reason}</p>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-200">
@@ -469,7 +631,7 @@ function App() {
                       </div>
                       <div>
                         <p className="text-slate-400">Confidence</p>
-                        <p>{Math.round(sig.confidence * 100)}%</p>
+                        <p>{formatConfidence(sig.confidence)}</p>
                       </div>
                     </div>
                   </div>
@@ -515,7 +677,7 @@ function App() {
                         </div>
                         <div>
                           <p className="text-slate-400">Qty</p>
-                          <p>{trade.quantity.toFixed(4)}</p>
+                          <p>{trade.quantity.toFixed(8)}</p>
                         </div>
                       </div>
                     </div>
@@ -535,7 +697,7 @@ function App() {
                   <div key={row.pair} className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{row.pair}</p>
-                      <Pill label={`Score ${row.score}`} />
+                      <Pill label={`Score ${formatScore(row.score)}`} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
                       <Pill label={`Price $${row.price?.toFixed(2) ?? "-"}`} />

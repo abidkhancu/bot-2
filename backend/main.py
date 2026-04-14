@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -35,7 +36,7 @@ paper_trading_engine = PaperTradingEngine(storage)
 market_scanner = MarketScanner(market_data_service, indicator_engine, storage)
 logger = logging.getLogger(__name__)
 
-DEFAULT_PAIRS = [
+FALLBACK_PAIRS = [
     "BTC/USDT",
     "ETH/USDT",
     "BNB/USDT",
@@ -48,26 +49,67 @@ DEFAULT_PAIRS = [
 ]
 
 
-AUTO_TRADE_TIMEFRAME = "1h"
-AUTO_TRADE_INTERVAL_SECONDS = 300
+MAX_RUNTIME_PAIRS = 200
+# Optional priority pair in BASE/QUOTE format (example: BTC/USDT), force-added when discovery omits it.
+PRIORITY_PAIR = os.getenv("BOT_PRIORITY_PAIR", "BTC/USDT")
+_last_filter_empty_state = False
+
+
+async def _runtime_pairs(max_pairs: int = MAX_RUNTIME_PAIRS) -> List[str]:
+    discovered_pairs = await market_data_service.fetch_usdt_pairs(max_pairs=max_pairs)
+    if discovered_pairs:
+        if PRIORITY_PAIR not in discovered_pairs:
+            # Keep the configured priority pair visible if exchange discovery temporarily omits it.
+            return [PRIORITY_PAIR, *discovered_pairs][:max_pairs]
+        return discovered_pairs
+    if PRIORITY_PAIR not in FALLBACK_PAIRS:
+        return [PRIORITY_PAIR, *FALLBACK_PAIRS][:max_pairs]
+    return FALLBACK_PAIRS[:max_pairs]
 
 
 async def _auto_trade_loop():
+    global _last_filter_empty_state
     while True:
         try:
             settings = storage.settings
             if settings.bot_running and settings.auto_trading_enabled:
-                for pair in DEFAULT_PAIRS:
-                    await _generate_signal_for_pair(pair, AUTO_TRADE_TIMEFRAME, settings)
-            await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
+                max_pairs = min(settings.auto_trade_max_pairs, MAX_RUNTIME_PAIRS)
+                selected_pair = (settings.auto_trade_pair or "ALL").strip().upper()
+                if selected_pair != "ALL":
+                    candidate_pairs = [selected_pair]
+                else:
+                    candidate_pairs = await _runtime_pairs(max_pairs=max_pairs)
+                scan_results = await market_scanner.scan(candidate_pairs, timeframe=settings.auto_trade_timeframe)
+                ranked_pairs = [r.pair for r in scan_results if r.score >= settings.min_market_score]
+                # If score filter removes everything, fall back to candidates so automation continues running.
+                target_pairs = ranked_pairs or candidate_pairs
+                if not ranked_pairs:
+                    if not _last_filter_empty_state:
+                        logger.warning(
+                            "Auto-trade: no pairs met minimum market score threshold (%.4f), "
+                            "falling back to %d unfiltered candidate pairs",
+                            settings.min_market_score,
+                            len(candidate_pairs),
+                        )
+                    _last_filter_empty_state = True
+                else:
+                    _last_filter_empty_state = False
+                for pair in target_pairs:
+                    await _generate_signal_for_pair(
+                        pair,
+                        settings.auto_trade_timeframe,
+                        settings,
+                        min_confidence=settings.min_signal_confidence,
+                    )
+            await asyncio.sleep(settings.auto_trade_interval_seconds)
         except Exception as exc:
             logger.exception("auto-trade loop error: %s", exc)
-            await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
+            await asyncio.sleep(storage.settings.auto_trade_interval_seconds)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    market_scan_task = asyncio.create_task(market_scanner.scan(DEFAULT_PAIRS))
+    market_scan_task = asyncio.create_task(market_scanner.scan(await _runtime_pairs()))
     auto_trade_task = asyncio.create_task(_auto_trade_loop())
     yield
     market_scan_task.cancel()
@@ -100,14 +142,21 @@ def _as_candles(df) -> List[dict]:
     ]
 
 
-async def _generate_signal_for_pair(pair: str, timeframe: str, settings: Settings) -> Optional[Signal]:
+async def _generate_signal_for_pair(
+    pair: str,
+    timeframe: str,
+    settings: Settings,
+    min_confidence: float = 0.0,
+) -> Optional[Signal]:
     df = await market_data_service.fetch_ohlcv(pair, timeframe=timeframe, limit=250)
+    latest_price = float(df["close"].iloc[-1]) if not df.empty else 0.0
+    await paper_trading_engine.evaluate_tp_sl(latest_price, pair=pair)
     indicators = indicator_engine.compute(df)
     signal = strategy_engine.generate_signal(pair, timeframe, df, indicators, settings)
     if signal:
         await storage.add_signal(signal)
-        await paper_trading_engine.apply_signal(signal, settings)
-        await paper_trading_engine.evaluate_tp_sl(signal.entry)
+        if signal.confidence >= min_confidence:
+            await paper_trading_engine.apply_signal(signal, settings)
     return signal
 
 
@@ -121,7 +170,7 @@ async def health() -> Health:
 async def get_prices(pair: str = "BTC/USDT", timeframe: str = "1m") -> PricesResponse:
     df = await market_data_service.fetch_ohlcv(pair, timeframe=timeframe, limit=200)
     indicators = indicator_engine.compute(df)
-    await paper_trading_engine.evaluate_tp_sl(float(df["close"].iloc[-1]) if not df.empty else 0)
+    await paper_trading_engine.evaluate_tp_sl(float(df["close"].iloc[-1]) if not df.empty else 0, pair=pair)
     return PricesResponse(pair=pair, timeframe=timeframe, candles=_as_candles(df), indicators=indicators)
 
 
@@ -191,14 +240,14 @@ async def update_settings(settings: Settings) -> Settings:
 
 @app.get("/pairs", response_model=List[str])
 async def list_pairs() -> List[str]:
-    return DEFAULT_PAIRS
+    return await _runtime_pairs()
 
 
 @app.post("/scan-market", response_model=List[MarketScanResult])
 async def scan_market(
     pairs: Optional[List[str]] = Body(None), timeframe: str = Body("1h")
 ) -> List[MarketScanResult]:
-    pair_list = pairs or DEFAULT_PAIRS
+    pair_list = pairs or await _runtime_pairs()
     return await market_scanner.scan(pair_list, timeframe=timeframe)
 
 

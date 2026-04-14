@@ -77,7 +77,7 @@ class MarketScanner:
             result = MarketScanResult(
                 pair=pair,
                 price=price,
-                score=round(score, 2),
+                score=score,
                 trend=trend,
                 volume=float(df["volume"].iloc[-1]),
                 rsi=indicators.rsi,
@@ -101,7 +101,7 @@ class MarketScanner:
                     entry=entry,
                     stop_loss=entry * 0.99 if entry else 0,
                     take_profit=entry * 1.02 if entry else 0,
-                    reason=f"Trend {result.trend} | score {result.score}",
+                    reason=f"AI-assisted trend analysis: {result.trend} | score {result.score:.4f}",
                     confidence=min(result.score / 2, 1.0),
                 )
             )

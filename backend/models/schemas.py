@@ -72,12 +72,21 @@ class Settings(BaseModel):
     take_profit_pct: float = Field(0.02, ge=0.0)
     stop_loss_pct: float = Field(0.01, ge=0.0)
     max_open_trades: int = Field(3, ge=1)
-    buy_rsi_threshold: float = Field(30, ge=0, le=100)
-    sell_rsi_threshold: float = Field(60, ge=0, le=100)
+    buy_rsi_threshold: float = Field(40, ge=0, le=100)
+    sell_rsi_threshold: float = Field(55, ge=0, le=100)
     mode: Mode = Mode.paper
     enable_database: bool = False
     auto_trading_enabled: bool = False
     bot_running: bool = False
+    auto_trade_timeframe: str = "1h"
+    auto_trade_pair: str = "ALL"
+    auto_trade_interval_seconds: int = Field(60, ge=15, le=3600)
+    auto_trade_max_pairs: int = Field(30, ge=1, le=200)
+    min_signal_confidence: float = Field(0.35, ge=0.0, le=1.0)
+    min_market_score: float = Field(0.3, ge=0.0, le=1.0)
+    use_smart_strategy: bool = True
+    min_trend_strength: float = Field(0.0015, ge=0.0, le=0.5)
+    min_regression_strength: float = Field(0.15, ge=0.0, le=1.0)
 
 
 class MarketScanResult(BaseModel):
