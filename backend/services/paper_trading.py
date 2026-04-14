@@ -29,13 +29,13 @@ class PaperTradingEngine:
 
     async def _open_long(self, signal: Signal, settings: Settings) -> None:
         balance = self.storage.get_balance()
-        if signal.entry <= 0:
+        if signal.entry <= 0 or balance <= 0:
             return
         risk_amount = balance * settings.risk_per_trade
         risk_per_unit = max(signal.entry - signal.stop_loss, 1e-6)
         risk_based_quantity = max(risk_amount / risk_per_unit, 0.0)
-        # signal.entry is already validated as positive, so cap size by available balance affordability.
-        balance_limited_quantity = max(balance / signal.entry, 0.0)
+        # Cap size by available-balance affordability after the positive-entry guard above.
+        balance_limited_quantity = balance / signal.entry
         quantity = min(risk_based_quantity, balance_limited_quantity)
         if quantity <= 0:
             return

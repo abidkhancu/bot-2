@@ -46,11 +46,11 @@ FALLBACK_PAIRS = [
     "DOGE/USDT",
     "DOT/USDT",
     "LTC/USDT",
-    "RAVE/USDT",  # User-requested pair fallback when market discovery is unavailable.
 ]
 
 
-MAX_RUNTIME_PAIRS = 120
+MAX_RUNTIME_PAIRS = 200
+# Optional priority pair (BASE/QUOTE, e.g. RAVE/USDT) force-added when discovery omits it.
 PRIORITY_PAIR = os.getenv("BOT_PRIORITY_PAIR", "RAVE/USDT")
 
 
@@ -61,6 +61,8 @@ async def _runtime_pairs(max_pairs: int = MAX_RUNTIME_PAIRS) -> List[str]:
             # Keep the configured priority pair visible if exchange discovery temporarily omits it.
             return [PRIORITY_PAIR, *discovered_pairs][:max_pairs]
         return discovered_pairs
+    if PRIORITY_PAIR not in FALLBACK_PAIRS:
+        return [PRIORITY_PAIR, *FALLBACK_PAIRS][:max_pairs]
     return FALLBACK_PAIRS[:max_pairs]
 
 
@@ -73,6 +75,7 @@ async def _auto_trade_loop():
                 candidate_pairs = await _runtime_pairs(max_pairs=max_pairs)
                 scan_results = await market_scanner.scan(candidate_pairs, timeframe=settings.auto_trade_timeframe)
                 ranked_pairs = [r.pair for r in scan_results if r.score >= settings.min_market_score]
+                # If score filter removes everything, fall back to candidates so automation continues running.
                 target_pairs = ranked_pairs or candidate_pairs
                 for pair in target_pairs:
                     await _generate_signal_for_pair(
