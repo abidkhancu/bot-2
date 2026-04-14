@@ -29,9 +29,15 @@ class PaperTradingEngine:
 
     async def _open_long(self, signal: Signal, settings: Settings) -> None:
         balance = self.storage.get_balance()
+        if signal.entry <= 0:
+            return
         risk_amount = balance * settings.risk_per_trade
         risk_per_unit = max(signal.entry - signal.stop_loss, 1e-6)
-        quantity = max(risk_amount / risk_per_unit, 0)
+        risk_based_quantity = max(risk_amount / risk_per_unit, 0.0)
+        affordable_quantity = max(balance / signal.entry, 0.0)
+        quantity = min(risk_based_quantity, affordable_quantity)
+        if quantity <= 0:
+            return
         trade = Trade(
             id=str(uuid.uuid4()),
             pair=signal.pair,

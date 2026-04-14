@@ -11,6 +11,22 @@ class StrategyEngine:
     def __init__(self) -> None:
         self._confidence_floor = 0.3
 
+    def _signal_confidence(self, base: float, indicators: IndicatorSet, is_buy: bool) -> float:
+        confidence = base
+
+        if indicators.ema_50 is not None and indicators.ema_200 is not None and indicators.ema_200 != 0:
+            trend_strength = abs(indicators.ema_50 - indicators.ema_200) / indicators.ema_200
+            confidence += min(trend_strength * 2.0, 0.2)
+
+        if indicators.macd_histogram is not None:
+            if (is_buy and indicators.macd_histogram > 0) or (not is_buy and indicators.macd_histogram < 0):
+                confidence += min(abs(indicators.macd_histogram), 0.1)
+
+        if indicators.regression_strength is not None:
+            confidence += min(indicators.regression_strength * 0.2, 0.2)
+
+        return min(max(confidence, self._confidence_floor), 1.0)
+
     def generate_signal(
         self,
         pair: str,
@@ -28,7 +44,11 @@ class StrategyEngine:
 
         # BUY condition
         if price > indicators.ema_200 and indicators.rsi < settings.buy_rsi_threshold:
-            confidence = self._confidence_floor + (settings.buy_rsi_threshold - indicators.rsi) / 100
+            confidence = self._signal_confidence(
+                self._confidence_floor + (settings.buy_rsi_threshold - indicators.rsi) / 100,
+                indicators,
+                is_buy=True,
+            )
             return Signal(
                 pair=pair,
                 timeframe=timeframe,
@@ -36,13 +56,17 @@ class StrategyEngine:
                 entry=price,
                 take_profit=price * (1 + tp_pct),
                 stop_loss=price * (1 - sl_pct),
-                confidence=min(round(confidence, 2), 1.0),
+                confidence=confidence,
                 indicators=indicators,
             )
 
         # SELL condition
         if indicators.rsi > settings.sell_rsi_threshold:
-            confidence = self._confidence_floor + (indicators.rsi - settings.sell_rsi_threshold) / 100
+            confidence = self._signal_confidence(
+                self._confidence_floor + (indicators.rsi - settings.sell_rsi_threshold) / 100,
+                indicators,
+                is_buy=False,
+            )
             return Signal(
                 pair=pair,
                 timeframe=timeframe,
@@ -50,7 +74,7 @@ class StrategyEngine:
                 entry=price,
                 take_profit=price * (1 - tp_pct),
                 stop_loss=price * (1 + sl_pct),
-                confidence=min(round(confidence, 2), 1.0),
+                confidence=confidence,
                 indicators=indicators,
             )
 

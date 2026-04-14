@@ -35,7 +35,7 @@ paper_trading_engine = PaperTradingEngine(storage)
 market_scanner = MarketScanner(market_data_service, indicator_engine, storage)
 logger = logging.getLogger(__name__)
 
-DEFAULT_PAIRS = [
+FALLBACK_PAIRS = [
     "BTC/USDT",
     "ETH/USDT",
     "BNB/USDT",
@@ -45,11 +45,22 @@ DEFAULT_PAIRS = [
     "DOGE/USDT",
     "DOT/USDT",
     "LTC/USDT",
+    "RAVE/USDT",
 ]
 
 
 AUTO_TRADE_TIMEFRAME = "1h"
 AUTO_TRADE_INTERVAL_SECONDS = 300
+MAX_RUNTIME_PAIRS = 120
+
+
+async def _runtime_pairs(max_pairs: int = MAX_RUNTIME_PAIRS) -> List[str]:
+    discovered_pairs = await market_data_service.fetch_usdt_pairs(max_pairs=max_pairs)
+    if discovered_pairs:
+        if "RAVE/USDT" not in discovered_pairs:
+            discovered_pairs = ["RAVE/USDT", *discovered_pairs]
+        return discovered_pairs[:max_pairs]
+    return FALLBACK_PAIRS[:max_pairs]
 
 
 async def _auto_trade_loop():
@@ -57,7 +68,7 @@ async def _auto_trade_loop():
         try:
             settings = storage.settings
             if settings.bot_running and settings.auto_trading_enabled:
-                for pair in DEFAULT_PAIRS:
+                for pair in await _runtime_pairs():
                     await _generate_signal_for_pair(pair, AUTO_TRADE_TIMEFRAME, settings)
             await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
         except Exception as exc:
@@ -67,7 +78,7 @@ async def _auto_trade_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    market_scan_task = asyncio.create_task(market_scanner.scan(DEFAULT_PAIRS))
+    market_scan_task = asyncio.create_task(market_scanner.scan(await _runtime_pairs()))
     auto_trade_task = asyncio.create_task(_auto_trade_loop())
     yield
     market_scan_task.cancel()
@@ -191,14 +202,14 @@ async def update_settings(settings: Settings) -> Settings:
 
 @app.get("/pairs", response_model=List[str])
 async def list_pairs() -> List[str]:
-    return DEFAULT_PAIRS
+    return await _runtime_pairs()
 
 
 @app.post("/scan-market", response_model=List[MarketScanResult])
 async def scan_market(
     pairs: Optional[List[str]] = Body(None), timeframe: str = Body("1h")
 ) -> List[MarketScanResult]:
-    pair_list = pairs or DEFAULT_PAIRS
+    pair_list = pairs or await _runtime_pairs()
     return await market_scanner.scan(pair_list, timeframe=timeframe)
 
 

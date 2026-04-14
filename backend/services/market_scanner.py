@@ -77,7 +77,7 @@ class MarketScanner:
             result = MarketScanResult(
                 pair=pair,
                 price=price,
-                score=round(score, 2),
+                score=score,
                 trend=trend,
                 volume=float(df["volume"].iloc[-1]),
                 rsi=indicators.rsi,

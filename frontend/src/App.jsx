@@ -10,6 +10,10 @@ const formatRegressionFit = (value) => {
   if (value === undefined || value === null) return "-";
   return `${(value * 100).toFixed(1)}%`;
 };
+const formatConfidence = (value) => {
+  if (value === undefined || value === null) return "-";
+  return `${(value * 100).toFixed(2)}%`;
+};
 
 const StatCard = ({ title, value, accent }) => (
   <div className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/30 backdrop-blur">
@@ -415,7 +419,7 @@ function App() {
                   <div key={s.pair} className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{s.pair}</p>
-                      <Pill label={`${Math.round(s.confidence * 100)}%`} />
+                      <Pill label={formatConfidence(s.confidence)} />
                     </div>
                     <p className="text-slate-300">{s.reason}</p>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-200">
@@ -469,7 +473,7 @@ function App() {
                       </div>
                       <div>
                         <p className="text-slate-400">Confidence</p>
-                        <p>{Math.round(sig.confidence * 100)}%</p>
+                        <p>{formatConfidence(sig.confidence)}</p>
                       </div>
                     </div>
                   </div>
@@ -515,7 +519,7 @@ function App() {
                         </div>
                         <div>
                           <p className="text-slate-400">Qty</p>
-                          <p>{trade.quantity.toFixed(4)}</p>
+                          <p>{trade.quantity.toFixed(8)}</p>
                         </div>
                       </div>
                     </div>
@@ -535,7 +539,7 @@ function App() {
                   <div key={row.pair} className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{row.pair}</p>
-                      <Pill label={`Score ${row.score}`} />
+                      <Pill label={`Score ${row.score?.toFixed(4) ?? "-"}`} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
                       <Pill label={`Price $${row.price?.toFixed(2) ?? "-"}`} />
