@@ -144,13 +144,14 @@ async def _generate_signal_for_pair(
     min_confidence: float = 0.0,
 ) -> Optional[Signal]:
     df = await market_data_service.fetch_ohlcv(pair, timeframe=timeframe, limit=250)
+    latest_price = float(df["close"].iloc[-1]) if not df.empty else 0.0
+    await paper_trading_engine.evaluate_tp_sl(latest_price, pair=pair)
     indicators = indicator_engine.compute(df)
     signal = strategy_engine.generate_signal(pair, timeframe, df, indicators, settings)
     if signal:
         await storage.add_signal(signal)
         if signal.confidence >= min_confidence:
             await paper_trading_engine.apply_signal(signal, settings)
-            await paper_trading_engine.evaluate_tp_sl(signal.entry)
     return signal
 
 
@@ -164,7 +165,7 @@ async def health() -> Health:
 async def get_prices(pair: str = "BTC/USDT", timeframe: str = "1m") -> PricesResponse:
     df = await market_data_service.fetch_ohlcv(pair, timeframe=timeframe, limit=200)
     indicators = indicator_engine.compute(df)
-    await paper_trading_engine.evaluate_tp_sl(float(df["close"].iloc[-1]) if not df.empty else 0)
+    await paper_trading_engine.evaluate_tp_sl(float(df["close"].iloc[-1]) if not df.empty else 0, pair=pair)
     return PricesResponse(pair=pair, timeframe=timeframe, candles=_as_candles(df), indicators=indicators)
 
 

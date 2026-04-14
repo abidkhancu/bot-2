@@ -181,6 +181,9 @@ function App() {
             <p className="text-sm uppercase tracking-wide text-emerald-300">Paper Trading MVP</p>
             <h1 className="text-3xl font-bold text-white">Crypto Trading Bot</h1>
             <p className="text-sm text-slate-300">Async FastAPI backend • React + Tailwind UI</p>
+            <p className="text-xs text-emerald-200">
+              AI-assisted market analysis uses RSI, EMA, MACD, and regression scoring to guide entries/exits.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -323,7 +326,7 @@ function App() {
                       onChange={(e) =>
                         setSettingsForm({ ...settingsForm, auto_trade_timeframe: e.target.value })
                       }
-                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                      className="rounded border border-white/10 bg-slate-100 px-3 py-2 text-slate-900"
                     >
                       {TIMEFRAMES.map((tf) => (
                         <option key={tf} value={tf}>
@@ -339,7 +342,7 @@ function App() {
                       onChange={(e) =>
                         setSettingsForm({ ...settingsForm, auto_trade_pair: e.target.value })
                       }
-                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                      className="rounded border border-white/10 bg-slate-100 px-3 py-2 text-slate-900"
                     >
                       <option value="ALL">ALL</option>
                       {[...new Set([selectedPair, ...(pairs || [])].filter(Boolean))].map((p) => (
@@ -501,7 +504,7 @@ function App() {
                 <select
                   value={selectedPair}
                   onChange={(e) => setSelectedPair(e.target.value)}
-                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                      className="rounded border border-white/10 bg-slate-100 px-2 py-1 text-xs text-slate-900"
                 >
                   {pairs.length === 0 && <option value={selectedPair}>{selectedPair}</option>}
                   {pairs.map((p) => (
@@ -513,7 +516,7 @@ function App() {
                 <select
                   value={selectedTimeframe}
                   onChange={(e) => setSelectedTimeframe(e.target.value)}
-                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                  className="rounded border border-white/10 bg-slate-100 px-2 py-1 text-xs text-slate-900"
                 >
                   {TIMEFRAMES.map((tf) => (
                     <option key={tf} value={tf}>

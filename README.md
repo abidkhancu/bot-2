@@ -40,6 +40,8 @@ Set `BOT_PRIORITY_PAIR` (example: `BTC/USDT`) to force a preferred market into r
 - Auto-trading now uses scanner analysis ranking and confidence filtering before placing trades.
 - You can force auto-trading to run only on a selected pair via **Auto trade pair**.
 - Smart strategy mode adds trend/momentum/structure filters (EMA alignment, MACD direction, trend strength, regression strength) for higher-quality entries.
+- Auto-trading continuously analyzes market candles on every loop interval and auto-manages TP/SL with live pair prices.
+- The paper engine supports both BUY and SELL strategy actions (long/short style paper trades based on analysis signals).
 - Portfolio cards show dummy USDT balance, ROI, and win rate to evaluate bot performance.
 - If the dashboard loads without data, verify backend is running on `:8000` or set `VITE_API_BASE` so the UI can connect.
 
