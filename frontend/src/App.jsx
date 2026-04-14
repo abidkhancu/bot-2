@@ -5,7 +5,7 @@ const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (typeof window !== "undefined" ? `${window.location.origin}/api` : "/api");
 const REFRESH_MS = Number(import.meta.env.VITE_REFRESH_MS ?? 20000);
-const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
+const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"];
 const formatRegressionFit = (value) => {
   if (value === undefined || value === null) return "-";
   return `${(value * 100).toFixed(1)}%`;
@@ -198,6 +198,11 @@ function App() {
             <Pill label={status || "loading..."} />
           </div>
         </header>
+        {status === "backend unavailable" && (
+          <div className="mb-4 rounded-xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            Backend is not reachable. Start FastAPI on port 8000 or set VITE_API_BASE correctly to make live data visible.
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard
@@ -308,6 +313,85 @@ function App() {
                       min="1"
                       value={settingsForm.max_open_trades}
                       onChange={(e) => setSettingsForm({ ...settingsForm, max_open_trades: Number(e.target.value) })}
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Auto trade timeframe
+                    <select
+                      value={settingsForm.auto_trade_timeframe}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, auto_trade_timeframe: e.target.value })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    >
+                      {TIMEFRAMES.map((tf) => (
+                        <option key={tf} value={tf}>
+                          {tf}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Auto interval (seconds)
+                    <input
+                      type="number"
+                      min="15"
+                      max="3600"
+                      value={settingsForm.auto_trade_interval_seconds}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          auto_trade_interval_seconds: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Auto max pairs
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={settingsForm.auto_trade_max_pairs}
+                      onChange={(e) =>
+                        setSettingsForm({ ...settingsForm, auto_trade_max_pairs: Number(e.target.value) })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min signal confidence (0-1)
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settingsForm.min_signal_confidence}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_signal_confidence: Number(e.target.value),
+                        })
+                      }
+                      className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-slate-200">
+                    Min market score (0-1)
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settingsForm.min_market_score}
+                      onChange={(e) =>
+                        setSettingsForm({
+                          ...settingsForm,
+                          min_market_score: Number(e.target.value),
+                        })
+                      }
                       className="rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
                     />
                   </label>

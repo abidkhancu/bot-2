@@ -49,8 +49,6 @@ FALLBACK_PAIRS = [
 ]
 
 
-AUTO_TRADE_TIMEFRAME = "1h"
-AUTO_TRADE_INTERVAL_SECONDS = 300
 MAX_RUNTIME_PAIRS = 120
 PRIORITY_PAIR = "RAVE/USDT"
 
@@ -70,12 +68,22 @@ async def _auto_trade_loop():
         try:
             settings = storage.settings
             if settings.bot_running and settings.auto_trading_enabled:
-                for pair in await _runtime_pairs():
-                    await _generate_signal_for_pair(pair, AUTO_TRADE_TIMEFRAME, settings)
-            await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
+                max_pairs = min(settings.auto_trade_max_pairs, MAX_RUNTIME_PAIRS)
+                candidate_pairs = await _runtime_pairs(max_pairs=max_pairs)
+                scan_results = await market_scanner.scan(candidate_pairs, timeframe=settings.auto_trade_timeframe)
+                ranked_pairs = [r.pair for r in scan_results if r.score >= settings.min_market_score][:max_pairs]
+                target_pairs = ranked_pairs or candidate_pairs
+                for pair in target_pairs:
+                    await _generate_signal_for_pair(
+                        pair,
+                        settings.auto_trade_timeframe,
+                        settings,
+                        min_confidence=settings.min_signal_confidence,
+                    )
+            await asyncio.sleep(settings.auto_trade_interval_seconds)
         except Exception as exc:
             logger.exception("auto-trade loop error: %s", exc)
-            await asyncio.sleep(AUTO_TRADE_INTERVAL_SECONDS)
+            await asyncio.sleep(storage.settings.auto_trade_interval_seconds)
 
 
 @asynccontextmanager
@@ -113,14 +121,20 @@ def _as_candles(df) -> List[dict]:
     ]
 
 
-async def _generate_signal_for_pair(pair: str, timeframe: str, settings: Settings) -> Optional[Signal]:
+async def _generate_signal_for_pair(
+    pair: str,
+    timeframe: str,
+    settings: Settings,
+    min_confidence: float = 0.0,
+) -> Optional[Signal]:
     df = await market_data_service.fetch_ohlcv(pair, timeframe=timeframe, limit=250)
     indicators = indicator_engine.compute(df)
     signal = strategy_engine.generate_signal(pair, timeframe, df, indicators, settings)
     if signal:
         await storage.add_signal(signal)
-        await paper_trading_engine.apply_signal(signal, settings)
-        await paper_trading_engine.evaluate_tp_sl(signal.entry)
+        if signal.confidence >= min_confidence:
+            await paper_trading_engine.apply_signal(signal, settings)
+            await paper_trading_engine.evaluate_tp_sl(signal.entry)
     return signal
 
 

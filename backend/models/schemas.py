@@ -78,6 +78,11 @@ class Settings(BaseModel):
     enable_database: bool = False
     auto_trading_enabled: bool = False
     bot_running: bool = False
+    auto_trade_timeframe: str = "1h"
+    auto_trade_interval_seconds: int = Field(300, ge=15, le=3600)
+    auto_trade_max_pairs: int = Field(30, ge=1, le=200)
+    min_signal_confidence: float = Field(0.5, ge=0.0, le=1.0)
+    min_market_score: float = Field(0.3, ge=0.0, le=1.0)
 
 
 class MarketScanResult(BaseModel):
