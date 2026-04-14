@@ -68,7 +68,7 @@ class MarketDataService:
             ]
             pairs = sorted(set(pairs))
         except Exception:
-            logger.exception("fetch_usdt_pairs failed, using fallback list")
+            logger.exception("fetch_usdt_pairs failed, returning empty list for caller fallback handling")
             pairs = []
 
         async with self._lock:

@@ -34,6 +34,7 @@ class PaperTradingEngine:
         risk_amount = balance * settings.risk_per_trade
         risk_per_unit = max(signal.entry - signal.stop_loss, 1e-6)
         risk_based_quantity = max(risk_amount / risk_per_unit, 0.0)
+        # balance already reflects free cash after previous entries, so cap by current affordability.
         affordable_quantity = max(balance / signal.entry, 0.0)
         quantity = min(risk_based_quantity, affordable_quantity)
         if quantity <= 0:
