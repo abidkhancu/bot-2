@@ -14,6 +14,10 @@ const formatConfidence = (value) => {
   if (value === undefined || value === null) return "-";
   return `${(value * 100).toFixed(2)}%`;
 };
+const formatScore = (value) => {
+  if (value === undefined || value === null) return "-";
+  return value.toFixed(4);
+};
 
 const StatCard = ({ title, value, accent }) => (
   <div className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/30 backdrop-blur">
@@ -539,7 +543,7 @@ function App() {
                   <div key={row.pair} className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{row.pair}</p>
-                      <Pill label={`Score ${row.score?.toFixed(4) ?? "-"}`} />
+                      <Pill label={`Score ${formatScore(row.score)}`} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-300">
                       <Pill label={`Price $${row.price?.toFixed(2) ?? "-"}`} />

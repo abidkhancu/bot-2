@@ -58,6 +58,7 @@ async def _runtime_pairs(max_pairs: int = MAX_RUNTIME_PAIRS) -> List[str]:
     discovered_pairs = await market_data_service.fetch_usdt_pairs(max_pairs=max_pairs)
     if discovered_pairs:
         if "RAVE/USDT" not in discovered_pairs:
+            # Keep requested pair visible even if the exchange temporarily omits it from discovered markets.
             discovered_pairs = ["RAVE/USDT", *discovered_pairs]
         return discovered_pairs[:max_pairs]
     return FALLBACK_PAIRS[:max_pairs]
