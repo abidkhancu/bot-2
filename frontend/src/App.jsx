@@ -138,9 +138,14 @@ function App() {
   };
   const toggleAuto = async (enabled) => {
     const previous = settingsForm ? { ...settingsForm } : null;
-    setSettingsForm((prev) => (prev ? { ...prev, auto_trading_enabled: enabled } : prev));
+    const nextSettings = settingsForm ? { ...settingsForm, auto_trading_enabled: enabled } : null;
+    setSettingsForm(nextSettings);
     try {
-      await request(`/auto-trade/${enabled}`, { method: "POST" });
+      if (nextSettings) {
+        await request("/settings", { method: "POST", body: JSON.stringify(nextSettings) });
+      } else {
+        await request(`/auto-trade/${enabled}`, { method: "POST" });
+      }
       await loadAll();
     } catch (err) {
       console.error(err);
